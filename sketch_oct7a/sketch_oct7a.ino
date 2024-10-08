@@ -274,22 +274,25 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
-const int button1 = 5; // Pino do botao 1
-const int button2 = 6; // pino do botao 2
-const int button3 = 7; // pino do botao3
+#define button1 5 // Pino do botao 1
+#define button2 6 // pino do botao 2
+#define button3 7 // pino do botao3
 
 LiquidCrystal_I2C lcd(0x27,16,2); //endereçamento do LCD
-  
-const int TEMPO_ESPERA = 1500; //declaracao do intervalo de espera
+
+unsigned long startMillis; // Armazena o tempo inicial
 
 // declaraçao das minhas funçoes e variáveis
 int setar_intervalo = 0;
 bool intervalo_salvo = 0;
-bool peso_salvo = 0;
 unsigned long intervalo = 0;
-
+int setar_peso = 0;
+bool peso_salvo = 0;
+int peso = 0;
 void iniciarConfiguracao();
 void configurarIntervalo();
+void iniciar();
+bool contagemRegressiva();
 
 void setup ()
 {
@@ -297,13 +300,12 @@ void setup ()
   lcd.begin(16,2, 0x27); //inicializacao do display
   lcd.backlight(); // ligacao do backlight do LCD
   lcd.print("Comedouro Pets");
-  delay(TEMPO_ESPERA);
+  delay(1500);
   lcd.clear();
 
   pinMode(button1, INPUT_PULLUP);
   pinMode(button2, INPUT_PULLUP);
   pinMode(button3, INPUT_PULLUP);
-  
 }
 
 void loop ()
@@ -313,13 +315,22 @@ void loop ()
   }
 
   if (digitalRead(button2) == LOW){
-    lcd.print("Botao 2");
-    delay(TEMPO_ESPERA); //intervalo de espera para leitura
-    lcd.clear();
+    if (peso_salvo == 1 && intervalo_salvo == 1)
+    {
+      iniciar();
+    }
+    else {
+      lcd.print("Erro");
+      lcd.setCursor(0,1);
+      lcd.print("Nao Configurado");
+      lcd.setCursor(0,0);
+      delay(1500);
+      lcd.clear();
+    }
   }
-  if (digitalRead(button3) == LOW){
+  if (digitalRead(button3) == LOW){ // forçar saida de raçao sem timer ?
     lcd.print("Botao 3");
-    delay(TEMPO_ESPERA); //intervalo de espera para leitura
+    delay(1500); //intervalo de espera para leitura
     lcd.clear();
   }
 
@@ -328,41 +339,56 @@ void loop ()
   lcd.clear();
 }
 
-void iniciarConfiguracao(void) {
+void iniciarConfiguracao(void)
+{
+  intervalo_salvo = 0;
+  peso_salvo = 0;
   while(1) {
+    
+    lcd.setCursor(0,0);
+    lcd.print("Configuracao");
+    lcd.setCursor(0, 1);  // Posiciona o cursor na segunda linha, coluna 0
+    if (intervalo_salvo == 0)
+    {
+      lcd.print("Defina intervalo");
+    }
+    if (peso_salvo == 0 && intervalo_salvo == 1)
+    {
+      lcd.print("Defina Peso");
+    }
+    delay(500);
+    lcd.clear();
+    if (peso_salvo == 1 && intervalo_salvo == 1)
+    {
       lcd.setCursor(0,0);
       lcd.print("Configuracao");
-      lcd.setCursor(0, 1);  // Posiciona o cursor na segunda linha, coluna 0
-      if (intervalo_salvo == 0)
-      {
-        lcd.print("Defina intervalo");
-      }
-      if (peso_salvo == 0 && intervalo_salvo == 1)
-      {
-        lcd.print("Defina Peso");
-      }
+      lcd.setCursor(0,1);
+      lcd.print("Concluida");
+      lcd.setCursor(0,0);
+      delay(1500);
+      lcd.clear();
+      break;
+    }
+
+    if (digitalRead(button2) == LOW && intervalo_salvo == 0) { // vai iniciar a configuração de intervalo
+      configurarIntervalo();
+    }
+    if (digitalRead(button2) == LOW && intervalo_salvo == 1 && peso_salvo == 0) { // vai iniciar a configuração de peso
+      configurarPeso();
+    }
+
+    if (digitalRead(button3) == LOW) { // Vai quitar das configurações sem salvar nada
+      lcd.setCursor(0,0);
+      lcd.print("Nao Salvo");
       delay(500);
       lcd.clear();
-
-      if (digitalRead(button2) == LOW && intervalo_salvo == 0) { // vai iniciar a configuração de intervalo
-        configurarIntervalo();
-      }
-      if (digitalRead(button2) == LOW && intervalo_salvo == 0 && peso_salvo == 0) { // vai iniciar a configuração de peso
-        configurarPeso();
-      }
-
-      if (digitalRead(button3) == LOW) { // Vai quitar das configurações sem salvar nada
-        lcd.setCursor(0,0);
-        lcd.print("Nao Salvo");
-        delay(500);
-        lcd.clear();
-        intervalo_salvo = 0;
-        peso_salvo = 0;
-        break;
-      }
+      intervalo_salvo = 0;
+      peso_salvo = 0;
+      break;
     }
-    lcd.setCursor(0,0);
-    lcd.clear();
+  }
+  lcd.setCursor(0,0);
+  lcd.clear();
 }
 
 void configurarIntervalo() {
@@ -376,7 +402,7 @@ void configurarIntervalo() {
     if (digitalRead(button2) == LOW)
     {
       setar_intervalo++;
-      if (setar_intervalo == 3)
+      if (setar_intervalo == 5)
       {
         setar_intervalo = 0;
       }
@@ -387,12 +413,22 @@ void configurarIntervalo() {
       lcd.print("4 horas");
       intervalo = 4UL * 60 * 60 * 1000;
     }
-    if (setar_intervalo == 1)
+    else if (setar_intervalo == 1)
+    {
+        lcd.print("5 horas");
+        intervalo = 5UL * 60 * 60 * 1000;
+    }
+    else if (setar_intervalo == 2)
     {
         lcd.print("6 horas");
         intervalo = 6UL * 60 * 60 * 1000;
     }
-    if (setar_intervalo == 2)
+    else if (setar_intervalo == 3)
+    {
+        lcd.print("7 horas");
+        intervalo = 7UL * 60 * 60 * 1000;
+    }
+    else if (setar_intervalo == 4)
     {
         lcd.print("8 horas");
         intervalo = 8UL * 60 * 60 * 1000;
@@ -402,7 +438,7 @@ void configurarIntervalo() {
     if (digitalRead(button1) == LOW) { // vai salvar a configuração de intervalo
       lcd.setCursor(0,0);
       lcd.print("Intervalo Salvo");
-      delay(1000);
+      delay(1500);
       lcd.clear();
       intervalo_salvo = 1;
       break;
@@ -410,7 +446,7 @@ void configurarIntervalo() {
     if (digitalRead(button3) == LOW) { // vai quitar da configuração de intervalo
       lcd.setCursor(0,0);
       lcd.print("Nao Salvo");
-      delay(1000);
+      delay(1500);
       lcd.clear();
       intervalo_salvo = 0;
       break;
@@ -421,7 +457,162 @@ void configurarIntervalo() {
 
 void configurarPeso()
 {
-  
+  lcd.setCursor(0,0);
+  lcd.print("Peso");
+  delay(500);
+  lcd.clear();
+  while(1) {
+    lcd.setCursor(0,0);
+    lcd.print("Peso");
+    if (digitalRead(button2) == LOW)
+    {
+      setar_peso++;
+      if (setar_peso == 14)
+      {
+        setar_peso = 0;
+      }
+    }
+    lcd.setCursor(0, 1);  // Posiciona o cursor na segunda linha, coluna 0
+    if (setar_peso == 0)
+    {
+      lcd.print("100 gramas");
+      peso = 100;
+    }
+    else if (setar_peso == 1)
+    {
+        lcd.print("150 gramas");
+        peso = 150;
+    }
+    else if (setar_peso == 2)
+    {
+        lcd.print("200 gramas");
+        peso = 200;
+    }
+    else if (setar_peso == 3)
+    {
+        lcd.print("250 gramas");
+        peso = 250;
+    }
+    else if (setar_peso == 4)
+    {
+        lcd.print("300 gramas");
+        peso = 300;
+    }
+    else if (setar_peso == 5)
+    {
+        lcd.print("350 gramas");
+        peso = 350;
+    }
+    else if (setar_peso == 6)
+    {
+        lcd.print("400 gramas");
+        peso = 400;
+    }
+    else if (setar_peso == 7)
+    {
+        lcd.print("450 gramas");
+        peso = 450;
+    }
+    else if (setar_peso == 8)
+    {
+        lcd.print("500 gramas");
+        peso = 500;
+    }
+    else if (setar_peso == 9)
+    {
+        lcd.print("550 gramas");
+        peso = 550;
+    }
+    else if (setar_peso == 10)
+    {
+        lcd.print("600 gramas");
+        peso = 600;
+    }
+    else if (setar_peso == 11)
+    {
+        lcd.print("650 gramas");
+        peso = 650;
+    }
+    else if (setar_peso == 12)
+    {
+        lcd.print("700 gramas");
+        peso = 700;
+    }
+    else if (setar_peso == 13)
+    {
+        lcd.print("750 gramas");
+        peso = 750;
+    }
+    delay(250);
+    lcd.clear();
+    if (digitalRead(button1) == LOW) { // vai salvar a configuração de peso
+      lcd.setCursor(0,0);
+      lcd.print("Peso Salvo");
+      delay(1500);
+      lcd.clear();
+      peso_salvo = 1;
+      break;
+    }
+    if (digitalRead(button3) == LOW) { // vai quitar da configuração de peso
+      lcd.setCursor(0,0);
+      lcd.print("Peso Nao Salvo");
+      delay(1500);
+      lcd.clear();
+      peso_salvo = 0;
+      break;
+    } 
+  }
+  return ;
+}
+
+void iniciar()
+{
+  lcd.setCursor(0,0);
+  lcd.print("Iniciando");
+  delay(1500);
+  lcd.clear();
+  startMillis = millis();
+  while (contagemRegressiva())
+  {
+    delay(1000);
+    if (digitalRead(button3) == LOW) {
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Parando Contagem");
+      delay(1500);
+      lcd.clear();
+      break;
+    }
+  }
+}
+
+bool contagemRegressiva() {
+  unsigned long elapsedMillis = millis() - startMillis;  // Calcula o tempo decorrido
+  unsigned long remainingMillis = intervalo - elapsedMillis;  // Calcula o tempo restante
+
+  if (remainingMillis > 0) {
+    // Converte milissegundos restantes para horas, minutos e segundos
+    unsigned long secondsRemaining = remainingMillis / 1000;
+    int hours = secondsRemaining / 3600;
+    secondsRemaining %= 3600;
+    int minutes = secondsRemaining / 60;
+    int seconds = secondsRemaining % 60;
+
+    // Atualiza a segunda linha do LCD com o tempo restante
+    lcd.setCursor(0, 1);
+    lcd.print("Time: ");
+    lcd.print(hours);
+    lcd.print(":");
+    if (minutes < 10) lcd.print('0');  // Adiciona um zero para minutos < 10
+    lcd.print(minutes);
+    lcd.print(":");
+    if (seconds < 10) lcd.print('0');  // Adiciona um zero para segundos < 10
+    lcd.print(seconds);
+
+    return true;  // Continua a contagem
+  } else {
+    return false;  // Termina a contagem
+  }
 }
 
 
